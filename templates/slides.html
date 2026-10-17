@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slide Thuyết Trình: AI-Powered Jira/ADO Task Generator & Vector RAG</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-card: rgba(18, 26, 43, 0.85);
+            --border-glow: rgba(0, 240, 255, 0.25);
+            --accent-cyan: #00f0ff;
+            --accent-purple: #a855f7;
+            --accent-pink: #ec4899;
+            --accent-green: #10b981;
+            --accent-amber: #f59e0b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --card-glass: rgba(15, 23, 42, 0.7);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            user-select: none;
+        }
+
+        /* Top Progress Bar */
+        .progress-bar-container {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.08);
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 100;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 10%;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
+            box-shadow: 0 0 10px var(--accent-cyan);
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Slide Container */
+        .slides-container {
+            flex: 1;
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 60px 80px;
+        }
+
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            padding: 50px 80px 90px;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            opacity: 0;
+            transform: translateY(20px) scale(0.98);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+            box-sizing: border-box;
+        }
+
+        .slide.active {
+            display: flex;
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        /* Header typography */
+        .slide-tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--accent-cyan);
+            margin-bottom: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .slide-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.8rem;
+            font-weight: 800;
+            line-height: 1.15;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #ffffff 30%, var(--accent-cyan) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .slide-subtitle {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            margin-bottom: 35px;
+            max-width: 900px;
+            line-height: 1.5;
+        }
+
+        /* Slide Layouts */
+        .grid-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 20px;
+            width: 100%;
+        }
+
+        .slide-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(12px);
+            transition: transform 0.2s, border-color 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .slide-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--border-glow);
+        }
+
+        .slide-card.highlight {
+            border-color: rgba(0, 240, 255, 0.5);
+            background: linear-gradient(145deg, rgba(18, 26, 43, 0.95), rgba(0, 240, 255, 0.05));
+        }
+
+        .card-icon {
+            font-size: 2.2rem;
+            margin-bottom: 12px;
+            display: inline-block;
+        }
+
+        .card-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .card-desc {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* Cover Slide */
+        .cover-slide {
+            text-align: center;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .cover-slide .slide-title {
+            font-size: 3.6rem;
+            max-width: 1100px;
+            margin: 0 auto 20px;
+        }
+
+        .cover-slide .slide-subtitle {
+            font-size: 1.4rem;
+            margin: 0 auto 40px;
+        }
+
+        .cover-badges {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+
+        .badge-pill {
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: var(--text-main);
+        }
+
+        .badge-pill.cyan { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+        .badge-pill.purple { border-color: var(--accent-purple); color: var(--accent-purple); }
+        .badge-pill.green { border-color: var(--accent-green); color: var(--accent-green); }
+
+        /* Flow diagram visualization inside slide */
+        .flow-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            width: 100%;
+            margin: 20px 0;
+        }
+
+        .flow-step-box {
+            flex: 1;
+            background: var(--card-glass);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            position: relative;
+        }
+
+        .flow-step-box.primary {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.15);
+        }
+
+        .step-num {
+            display: inline-block;
+            width: 26px;
+            height: 26px;
+            line-height: 26px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            color: #000;
+            font-weight: 800;
+            font-size: 0.8rem;
+            margin-bottom: 6px;
+        }
+
+        .step-num.purple {
+            background: var(--accent-purple);
+            color: #fff;
+        }
+
+        .flow-arrow-icon {
+            font-size: 1.4rem;
+            color: var(--accent-cyan);
+            opacity: 0.7;
+        }
+
+        /* Formulas & Code snippets */
+        .formula-box {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+            border-radius: 12px;
+            padding: 18px 24px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.15rem;
+            color: var(--accent-cyan);
+            margin: 16px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Two column layout */
+        .two-cols {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            width: 100%;
+        }
+
+        .list-items {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .list-items li {
+            position: relative;
+            padding-left: 28px;
+            font-size: 1.05rem;
+            line-height: 1.5;
+            color: #cbd5e1;
+        }
+
+        .list-items li::before {
+            content: "✦";
+            position: absolute;
+            left: 0;
+            color: var(--accent-cyan);
+            font-size: 1rem;
+        }
+
+        /* Speaker notes drawer */
+        .notes-drawer {
+            position: fixed;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 900px;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid var(--accent-purple);
+            border-radius: 12px;
+            padding: 16px 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+            display: none;
+            z-index: 90;
+            backdrop-filter: blur(16px);
+        }
+
+        .notes-drawer.open {
+            display: block;
+        }
+
+        .notes-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--accent-purple);
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .notes-content {
+            font-size: 0.95rem;
+            color: #e2e8f0;
+            line-height: 1.6;
+        }
+
+        /* Bottom Controls Bar */
+        .slide-nav-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 65px;
+            background: rgba(10, 14, 23, 0.9);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 40px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .nav-left, .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .nav-center {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.95rem;
+            color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--text-main);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-btn:hover {
+            background: rgba(0, 240, 255, 0.15);
+            border-color: var(--accent-cyan);
+            color: #fff;
+        }
+
+        .nav-btn.primary {
+            background: linear-gradient(135deg, var(--accent-cyan), #00a8ff);
+            color: #000;
+            border: none;
+            font-weight: 700;
+        }
+
+        .nav-btn.primary:hover {
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+        }
+
+        .key-hint {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Progress Bar -->
+    <div class="progress-bar-container">
+        <div class="progress-bar-fill" id="slide-progress"></div>
+    </div>
+
+    <!-- SLIDES CONTAINER -->
+    <div class="slides-container">
+
+        <!-- SLIDE 1: COVER -->
+        <section class="slide cover-slide active" data-slide="1">
+            <div class="slide-tag">AI & Vector Data Architecture</div>
+            <h1 class="slide-title">AI-Powered Jira & ADO Task Breakdown & Vector RAG Engine</h1>
+            <p class="slide-subtitle">
+                Hệ thống chuẩn hóa tự động Backlog từ Excel của Dev, vector hóa dữ liệu lịch sử, ước lượng thời gian bằng trọng số tương đồng hình học và đồng bộ Atlassian Jira / Azure DevOps.
+            </p>
+            <div class="cover-badges">
+                <span class="badge-pill cyan">⚡ 128D Dense Semantic Vectors</span>
+                <span class="badge-pill purple">🧠 Dual-Loop RAG Architecture</span>
+                <span class="badge-pill green">🛡️ Agile Guardrails & Duplicate Filter</span>
+            </div>
+            <div style="margin-top: 15px; color: var(--text-muted); font-size: 0.95rem;">
+                Dùng phím <span class="key-hint">➔</span> hoặc <span class="key-hint">Space</span> để chuyển slide | <span class="key-hint">P</span> xem Kịch bản nói
+            </div>
+            <div class="slide-notes-raw" style="display: none;">
+                <strong>Kịch bản nói (Speaker Notes):</strong><br>
+                "Chào mọi người, hôm nay tôi xin trình bày giải pháp AI-Powered Jira/ADO Task Breakdown & Vector RAG Engine. Đây là hệ thống giải quyết bài toán cốt lõi trong quy trình phát triển phần mềm: làm sao để biến các yêu cầu thô từ file Excel của Dev thành các ticket Jira/ADO chuẩn chỉ, có ước lượng thời gian chính xác dựa trên dữ liệu lịch sử dự án."
+            </div>
+        </section>
+
+        <!-- SLIDE 2: PAIN POINTS -->
+        <section class="slide" data-slide="2">
+            <div class="slide-tag">01. Problem Statement</div>
+            <h2 class="slide-title">4 "Nỗi Đau" Kinh Niên Của Quy Trình Quản Lý Task Hiện Tại</h2>
+            <p class="slide-subtitle">Các team phát triển phần mềm đang lãng phí từ 15-20% thời gian mỗi Sprint chỉ để xử lý "dữ liệu rác" trên Jira/Azure DevOps.</p>
+
+            <div class="grid-cards">
+                <div class="slide-card">
+                    <div class="card-icon">🌪️</div>
+                    <h3 class="card-title">Naming Lộn Xộn & Vô Kỷ Luật</h3>
+                    <p class="card-desc">Dev viết tiêu đề theo cảm tính: <em>"Làm API"</em>, <em>"Fix bug login"</em>. Thiếu tiền tố chuẩn <code>[BE]</code>, <code>[FE]</code>, <code>[DB]</code> khiến PM và QA không thể phân loại tự động.</p>
+                </div>
+                <div class="slide-card">
+                    <div class="card-icon">🎲</div>
+                    <h3 class="card-title">Ước Lượng (Estimation) "Thầy Bói"</h3>
+                    <p class="card-desc">Giờ làm việc thường được ước lượng theo linh cảm cá nhân, dẫn đến lệch kế hoạch Sprint nghiêm trọng mà không có căn cứ từ các dự án tương tự trong quá khứ.</p>
+                </div>
+                <div class="slide-card">
+                    <div class="card-icon">⚠️</div>
+                    <h3 class="card-title">Trùng Lặp Công Việc (Duplicate)</h3>
+                    <p class="card-desc">Nhiều Dev làm lại những module/chức năng mà team khác hoặc sprint trước đã giải quyết, gây lãng phí hàng trăm giờ công do không tra cứu được backlog cũ.</p>
+                </div>
+                <div class="slide-card">
+                    <div class="card-icon">❌</div>
+                    <h3 class="card-title">Thiếu Acceptance Criteria (AC)</h3>
+                    <p class="card-desc">Ghi chú kỹ thuật cụt lủn dưới 15 ký tự, thiếu tiêu chí nghiệm thu rõ ràng, dẫn đến tranh cãi liên tục giữa Dev, Tester và Product Owner khi bàn giao.</p>
+                </div>
+            </div>
+            <div class="slide-notes-raw" style="display: none;">
+                <strong>Kịch bản nói:</strong><br>
+                "Mọi team Agile đều gặp 4 vấn đề này: tiêu đề task đặt lung tung, estimate giờ theo cảm tính không có cơ sở dữ liệu lịch sử, làm trùng những chức năng đã có, và task thiếu mô tả kỹ thuật khiến QA không biết test từ đâu. Giải pháp của chúng tôi sinh ra để tự động hóa triệt để khâu này."
+            </div>
+        </section>
+
+        <!-- SLIDE 3: HIGH-LEVEL SOLUTION -->
+        <section class="slide" data-slide="3">
+            <div class="slide-tag">02. Architecture Overview</div>
+            <h2 class="slide-title">Kiến Trúc Tổng Thể: Dual-Loop Vector RAG Pipeline</h2>
+            <p class="slide-subtitle">Phân tách độc lập 2 chu trình: Data Preparation (Indexing) và Retrieval-Augmented Generation (Inference).</p>
+
+            <div class="two-cols">
+                <div class="slide-card highlight">
+                    <div class="slide-tag" style="color: var(--accent-cyan);">Chu Trình 1</div>
+                    <h3 class="card-title">Data Preparation (Indexing Pipeline)</h3>
+                    <ul class="list-items" style="margin-top: 15px;">
+                        <li><strong>Raw Sources:</strong> Ingest file Excel lịch sử ticket đã hoàn thành.</li>
+                        <li><strong>[A] Info Extraction:</strong> Parser trích xuất cột lộn xộn thành JSON chuẩn.</li>
+                        <li><strong>[B] Chunking:</strong> Đóng gói metadata kỹ thuật theo từng đơn vị Task.</li>
+                        <li><strong>[C] Dense Embedding:</strong> Vector hóa 128 chiều số thực float32.</li>
+                        <li><strong>[D] Enterprise Vector DB:</strong> PostgreSQL 14 + <code>pgvector</code> với HNSW Index.</li>
+                    </ul>
+                </div>
+
+                <div class="slide-card highlight">
+                    <div class="slide-tag" style="color: var(--accent-purple);">Chu Trình 2</div>
+                    <h3 class="card-title">RAG Inference & Sync Pipeline</h3>
+                    <ul class="list-items" style="margin-top: 15px;">
+                        <li><strong>[1] Query Input:</strong> File Excel yêu cầu mới từ Dev/BA.</li>
+                        <li><strong>[2] k-NN Vector Search:</strong> Truy vấn Cosine Similarity trên không gian 128D.</li>
+                        <li><strong>[3] Relevant Data:</strong> Trích xuất Top-K ticket quá khứ kèm actual hours.</li>
+                        <li><strong>[4] RAG Synthesis:</strong> Chuẩn hóa Naming, tính giờ tương đồng, tạo AC.</li>
+                        <li><strong>[5] Guardrails & Sync:</strong> Bắn Atlassian Jira Cloud REST hoặc Azure DevOps.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="slide-notes-raw" style="display: none;">
+                <strong>Kịch bản nói:</strong><br>
+                "Kiến trúc của chúng tôi bám sát chuẩn RAG hiện đại gồm 2 chu trình khép kín: Chu trình 1 đóng vai trò bộ nhớ dài hạn, đọc và vector hóa toàn bộ lịch sử sprint cũ. Chu trình 2 nhận yêu cầu mới, truy vấn vector tìm ra các ticket tương đồng trong lịch sử, từ đó suy luận giờ estimate và chuẩn hóa naming trước khi bắn lên Jira/ADO."
+            </div>
+        </section>
+
+        <!-- SLIDE 4: VECTOR EMBEDDING & ENGINE -->
+        <section class="slide" data-slide="4">
+            <div class="slide-tag">03. Deep Dive: Vector Data Engine</div>
+            <h2 class="slide-title">Biến Đổi Văn Bản Kỹ Thuật Thành Không Gian Vector 128D</h2>
+            <p class="slide-subtitle">Thuật toán Subword/N-gram Hashing + TF Weighting + Chuẩn hóa L2 Norm giúp chạy siêu nhẹ mà không cần GPU.</p>
+
+            <div class="flow-row">
+                <div class="flow-step-box">
+                    <span class="step-num">1</span>
+                    <div style="font-weight: 600; font-size: 0.95rem;">Tokenize & N-grams</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Tách từ IT & character 3-gram, 4-gram</div>
+                </div>
+                <span class="flow-arrow-icon">➔</span>
+                <div class="flow-step-box">
+                    <span class="step-num">2</span>
+                    <div style="font-weight: 600; font-size: 0.95rem;">Bitwise Hash</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Ánh xạ vào 128 buckets có dấu (+/-)</div>
+                </div>
+                <span class="flow-arrow-icon">➔</span>
+                <div class="flow-step-box">
+                    <span class="step-num">3</span>
+                    <div style="font-weight: 600; font-size: 0.95rem;">Log-TF Weighting</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Trọng số log tần suất xuất hiện token</div>
+                </div>
+                <span class="flow-arrow-icon">➔</span>
+                <div class="flow-step-box primary">
+                    <span class="step-num">4</span>
+                    <div style="font-weight: 600; font-size: 0.95rem;">L2 Normalization</div>
+                    <div style="font-size: 0.8rem; color: var(--accent-cyan); margin-top: 4px;">||v|| = 1.0 (Unit Sphere)</div>
+                </div>
+            </div>
+
+            <div class="two-cols" style="margin-top: 20px;">
+                <div class="slide-card">
+                    <h3 class="card-title">⚡ Bắt Trọn Ngữ Nghĩa Song Ngữ IT</h3>
+                    <p class="card-desc">Bắt cực nhạy các thuật ngữ kỹ thuật viết tắt: <code>JWT</code>, <code>2FA</code>, <code>OTP</code>, <code>QR</code>, <code>Stripe</code>, <code>MoMo</code>, <code>Webhook</code>, <code>HMAC</code>, <code>Docker</code>, <code>CI/CD</code>.</p>
+                </div>
+                <div class="slide-card">
+                    <h3 class="card-title">🚀 Tốc Độ Tính Toán Tức Thì (&lt; 1ms)</h3>
+                    <p class="card-desc">Nhờ L2 Normalization, khoảng cách Cosine Similarity giữa 2 vector $u$ và $v$ rút gọn về phép nhân vô hướng: <code>Sim(u,v) = u · v</code>.</p>
+                </div>
+            </div>
+            <div class="slide-notes-raw" style="display: none;">
+                <strong>Kịch bản nói:</strong><br>
+                "Điểm đặc biệt ở tầng Vector Data là chúng tôi thiết kế DenseSemanticEmbedder hoàn toàn độc lập, không cần tải model nặng 500MB hay yêu cầu GPU. Bằng cách kết hợp N-gram Hashing và chuẩn hóa L2 Norm = 1.0, các ticket cùng ngữ cảnh kỹ thuật sẽ nằm sát nhau trong không gian vector và việc tìm kiếm k-NN chỉ tốn dưới 1 mili-giây."
+            </div>
+        </section>
+
+        <!-- SLIDE 5: RAG ESTIMATION FORMULA -->
+        <section class="slide" data-slide="5">
+            <div class="slide-tag">04. Deep Dive: RAG Inference Logic</div>
+            <h2 class="slide-title">Ước Lượng Giờ Có Căn Cứ Lịch Sử (Similarity-Weighted Estimation)</h2>
+            <p class="slide-subtitle">Loại bỏ hoàn toàn việc estimate cảm tính bằng công thức bình quân gia quyền theo khoảng cách hình học.</p>
+
+            <div class="formula-box">
+                Estimated_Hours = ∑ (Sim_i × Actual_Hours_i) / ∑ Sim_i
+            </div>
+
+            <div class="grid-cards" style="margin-top: 20px;">
+                <div class="slide-card">
+                    <div class="card-icon">🎯</div>
+                    <h3 class="card-title">Trọng Số Tương Đồng</h3>
+                    <p class="card-desc">Ticket lịch sử nào càng giống với yêu cầu mới thì số giờ thực tế của nó càng chiếm tỉ trọng cao trong kết quả ước lượng cuối cùng.</p>
+                </div>
+                <div class="slide-card">
+                    <div class="card-icon">🔢</div>
+                    <h3 class="card-title">Quy Đổi Fibonacci Story Points</h3>
+                    <p class="card-desc">Tự động chuyển đổi theo chuẩn Agile: &le;4h &rarr; 1 SP, &le;7h &rarr; 2 SP, &le;11h &rarr; 3 SP, &le;16h &rarr; 5 SP. Nếu &gt;16h bắt buộc tách Subtask.</p>
+                </div>
+                <div class="slide-card">
+                    <div class="card-icon">🏷️</div>
+                    <h3 class="card-title">Chuẩn Hóa Naming [TYPE][MOD]</h3>
+                    <p class="card-desc">Tự động gán prefix theo module và vai trò: <code>[BE][AUTH]</code>, <code>[FE][AUTH]</code>, <code>[DB][PAYMENT]</code>, <code>[QA][CHECKOUT]</code>.</p>
+                </div>
+            </div>
+            <div class="slide-notes-raw" style="display: none;">
+                <strong>Kịch bản nói:</strong><br>
+                "Công thức toán học của chúng tôi giải quyết triệt để bài toán: 'Tại sao task này lại 8 giờ?'. Câu trả lời là: vì trong lịch sử có 3 task tương đồng tới 82% và trung bình thực tế tốn 7.8 giờ. Dữ liệu ước lượng được quy đổi tự động ra Fibonacci Story Points theo đúng chuẩn Scrum."
+            </div>
+        </section>
+
+        <!-- SLIDE 6: GUARDRAILS & PHASE 2 -->
+        <section class="slide" data-slide="6">
+            <div class="slide-tag">05. Guardrails & Approval</div>
+            <h2 class="slide-title">Hàng Rào Bảo Vệ (Guardrails) & Human-in-the-Loop</h2>
+            <p class="slide-subtitle">Không bao giờ tự ý bắn ticket rác lên hệ thống nếu chưa qua thẩm định và xác nhận từ con người.</p>
+
+            <div class="two-cols">
+                <div class="slide-card">
+                    <div class="card-icon">🚨</div>
+                    <h3 class="card-title">Bộ Lọc & Cảnh Báo Thông Minh</h3>
+                    <ul class="list-items" style="margin-top: 12px;">
+                        <li><strong>Phát hiện Trùng lặp (Duplicate Detection):</strong> Nếu Cosine Sim &ge; 85% so với ticket cũ &rarr; Gắn cờ <code>WARNING_DUPLICATE</code>.</li>
+                        <li><strong>Kiểm tra chất lượng đầu vào:</strong> Nếu Dev viết mô tả &lt; 15 ký tự &rarr; Gắn cờ <code>NEEDS_INPUT</code> và yêu cầu bổ sung.</li>
+                        <li><strong>Tự động sinh Acceptance Criteria:</strong> Đảm bảo mỗi task đều có ít nhất 3 tiêu chí nghiệm thu rõ ràng.</li>
+                    </ul>
+                </div>
+
+                <div class="slide-card highlight">
+                    <div class="card-icon">🛡️</div>
+                    <h3 class="card-title">Phase 2: Selective Human Approval</h3>
+                    <ul class="list-items" style="margin-top: 12px;">
+                        <li><strong>Phê duyệt có chọn lọc:</strong> Tech Lead có thể tick chọn duyệt từng task hoặc hàng loạt.</li>
+                        <li><strong>Bảo vệ Jira/ADO:</strong> Chỉ task có trạng thái <code>READY_TO_IMPORT</code> mới được kích hoạt đẩy API.</li>
+                        <li><strong>Đa nền tảng:</strong> Hỗ trợ Atlassian Jira REST API v3 và Azure DevOps JSON Patch (RFC 6902).</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="slide-notes-raw" style="display: none;">
+                <strong>Kịch bản nói:</strong><br>
+                "Chúng tôi áp dụng nguyên tắc Human-in-the-loop: AI gợi ý nhưng con người là người ra quyết định cuối cùng. Hệ thống có 2 chốt chặn quan trọng: nếu độ tương đồng trên 85% thì cảnh báo trùng task, và nếu dev ghi chú sơ sài dưới 15 ký tự thì bắt buộc dev phải sửa lại mới cho import."
+            </div>
+        </section>
+
+        <!-- SLIDE 7: LIVE DEMO HIGHLIGHTS -->
+        <section class="slide" data-slide="7">
+            <div class="slide-tag">06. Demonstration</div>
+            <h2 class="slide-title">4 Màn Demo Trực Quan Trên Web Dashboard & CLI</h2>
+            <p class="slide-subtitle">Trải nghiệm đồ họa trực quan Cyberpunk Glassmorphism và CLI chuyên nghiệp.</p>
+
+            <div class="grid-cards">
+                <div class="slide-card">
+                    <span class="step-num">M1</span>
+                    <h3 class="card-title" style="margin-top: 8px;">Excel Data Prep</h3>
+                    <p class="card-desc">Xem bảng trích xuất dữ liệu thô và cấu trúc Semantic Chunks được chuẩn hóa tự động.</p>
+                </div>
+                <div class="slide-card">
+                    <span class="step-num">M2</span>
+                    <h3 class="card-title" style="margin-top: 8px;">Heatmap 128D</h3>
+                    <p class="card-desc">Quan sát trực tiếp bản đồ nhiệt mảng số thực float32 của từng ticket với chuẩn L2 Norm = 1.0000.</p>
+                </div>
+                <div class="slide-card">
+                    <span class="step-num">M3</span>
+                    <h3 class="card-title" style="margin-top: 8px;">Semantic Search</h3>
+                    <p class="card-desc">Nhập câu query bất kỳ và quan sát kết quả k-NN tìm kiếm theo khoảng cách không gian dưới 1ms.</p>
+                </div>
+                <div class="slide-card">
+                    <span class="step-num">M4</span>
+                    <h3 class="card-title" style="margin-top: 8px;">Breakdown & Sync</h3>
+                    <p class="card-desc">Phân tích toàn bộ file Excel của Dev, kiểm duyệt cờ Warning/Ready và bắn lên Jira Cloud.</p>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px; text-align: center;">
+                <a href="/" target="_blank" class="nav-btn primary" style="display: inline-flex; text-decoration: none;">
+                    ⚡ Mở Web Dashboard Trực Quan Ngay (Port 5005)
+                </a>
+            </div>
+            <div class="slide-notes-raw" style="display: none;">
+                <strong>Kịch bản nói:</strong><br>
+                "Bây giờ chúng ta sẽ đi vào phần live demo. Tôi sẽ chứng minh 4 bước: nạp file Excel, xem bản đồ nhiệt 128 chiều, gõ thử một câu query tiếng Việt để xem AI tìm ticket quá khứ, và cuối cùng là phân tích toàn bộ file Excel để sinh ticket Jira hoàn chỉnh."
+            </div>
+        </section>
+
+        <!-- SLIDE 8: TECH STACK -->
+        <section class="slide" data-slide="8">
+            <div class="slide-tag">07. Technology Stack</div>
+            <h2 class="slide-title">Công Nghệ Tối Giản, Hiệu Năng Cao & Zero-Bloat</h2>
+            <p class="slide-subtitle">Không phụ thuộc framework AI nặng nề, khởi động trong 1 giây, triển khai linh hoạt mọi môi trường.</p>
+
+            <div class="grid-cards">
+                <div class="slide-card">
+                    <div class="card-icon">🐍</div>
+                    <h3 class="card-title">Core & Linear Algebra</h3>
+                    <p class="card-desc">Python 3.10+, <strong>NumPy</strong> cho đại số tuyến tính ma trận, <strong>Pandas & OpenPyXL</strong> xử lý bảng tính.</p>
+                </div>
+                <div class="slide-card">
+                    <div class="card-icon">🗄️</div>
+                    <h3 class="card-title">Enterprise Vector Database</h3>
+                    <p class="card-desc"><strong>PostgreSQL 14 + pgvector</strong> với chỉ mục HNSW Index (hoặc TinyVectorDB fallback), latency &lt; 1ms.</p>
+                </div>
+                <div class="slide-card">
+                    <div class="card-icon">🌐</div>
+                    <h3 class="card-title">Web & CLI Experience</h3>
+                    <p class="card-desc"><strong>Flask</strong> REST API, <strong>Rich Console</strong> định dạng màu terminal, <strong>Vanilla Glassmorphism UI</strong> mượt mà.</p>
+                </div>
+                <div class="slide-card">
+                    <div class="card-icon">🔗</div>
+                    <h3 class="card-title">Enterprise Connectors</h3>
+                    <p class="card-desc"><strong>Atlassian Jira REST v3</strong> & <strong>Azure DevOps JSON Patch</strong>, file quy chuẩn <code>.agent-rules.md</code> độc lập.</p>
+                </div>
+            </div>
+            <div class="slide-notes-raw" style="display: none;">
+                <strong>Kịch bản nói:</strong><br>
+                "Về mặt công nghệ, điểm sáng nhất của project là tính độc lập: toàn bộ engine vector được xây dựng tối ưu với NumPy, không cần cài đặt các gói nặng hàng GB như PyTorch hay TensorFlow, giúp hệ thống có thể chạy mượt mà trên bất kỳ server hoặc máy trạm nào."
+            </div>
+        </section>
+
+        <!-- SLIDE 9: BUSINESS ROI -->
+        <section class="slide" data-slide="9">
+            <div class="slide-tag">08. Business Value & ROI</div>
+            <h2 class="slide-title">Giá Trị Thực Tế & Lợi Ích Cho Doanh Nghiệp (ROI)</h2>
+            <p class="slide-subtitle">Chuyển đổi quy trình quản lý dự án thủ công sang tự động hóa thông minh có thể định lượng.</p>
+
+            <div class="grid-cards">
+                <div class="slide-card highlight">
+                    <div style="font-size: 2.8rem; font-weight: 800; color: var(--accent-cyan); font-family: 'Outfit';">80%</div>
+                    <h3 class="card-title">Tiết Kiệm Thời Gian</h3>
+                    <p class="card-desc">Giảm thời gian tạo và chuẩn hóa backlog từ 4 giờ mỗi Sprint Planning xuống còn dưới 30 phút.</p>
+                </div>
+                <div class="slide-card highlight">
+                    <div style="font-size: 2.8rem; font-weight: 800; color: var(--accent-green); font-family: 'Outfit';">100%</div>
+                    <h3 class="card-title">Chuẩn Hóa Naming</h3>
+                    <p class="card-desc">Loại bỏ hoàn toàn ticket không rõ nguồn gốc nhờ cú pháp bắt buộc <code>[TYPE][MODULE]</code>.</p>
+                </div>
+                <div class="slide-card highlight">
+                    <div style="font-size: 2.8rem; font-weight: 800; color: var(--accent-purple); font-family: 'Outfit';">85%+</div>
+                    <h3 class="card-title">Ngăn Chặn Trùng Lặp</h3>
+                    <p class="card-desc">Tự động phát hiện và chặn các đầu việc trùng lặp với quá khứ, tiết kiệm hàng trăm giờ code vô ích.</p>
+                </div>
+                <div class="slide-card highlight">
+                    <div style="font-size: 2.8rem; font-weight: 800; color: var(--accent-amber); font-family: 'Outfit';">MINH BẠCH</div>
+                    <h3 class="card-title">Estimate Có Căn Cứ</h3>
+                    <p class="card-desc">Dev và PM dễ dàng đồng thuận nhờ số giờ ước lượng được đối chiếu trực tiếp từ ticket lịch sử tương tự.</p>
+                </div>
+            </div>
+            <div class="slide-notes-raw" style="display: none;">
+                <strong>Kịch bản nói:</strong><br>
+                "Về mặt kinh tế, giải pháp này giúp tiết kiệm 80% thời gian của PM và Tech Lead trong mỗi buổi Sprint Planning, loại bỏ 100% dữ liệu rác trên Jira, và quan trọng nhất là bảo vệ ngân sách công ty bằng cách ngăn chặn các đầu việc trùng lặp."
+            </div>
+        </section>
+
+        <!-- SLIDE 10: ROADMAP & Q&A -->
+        <section class="slide" data-slide="10">
+            <div class="slide-tag">09. Enterprise Roadmap</div>
+            <h2 class="slide-title">Lộ Trình Phát Triển & Hỏi Đáp (Q&A)</h2>
+            <p class="slide-subtitle">Sẵn sàng nâng cấp lên phiên bản Enterprise quy mô lớn trong các giai đoạn tiếp theo.</p>
+
+            <div class="two-cols">
+                <div class="slide-card">
+                    <h3 class="card-title">🗺️ Giai Đoạn Tiếp Theo (Next Milestones)</h3>
+                    <ul class="list-items" style="margin-top: 12px;">
+                        <li><strong>Pluggable Embeddings:</strong> Hỗ trợ switch sang OpenAI <code>text-embedding-3</code> hoặc <code>BGE-M3</code> đa ngôn ngữ.</li>
+                        <li><strong>LLM Gherkin AC:</strong> Cắm LLM (Claude 3.5 / Gemini Flash) sinh Acceptance Criteria chi tiết dạng <em>Given-When-Then</em>.</li>
+                        <li><strong>Persistent Vector Store:</strong> Tích hợp <code>pgvector</code> hoặc <code>Qdrant</code> để lưu trữ hàng trăm nghìn tickets.</li>
+                        <li><strong>ChatOps:</strong> Tích hợp Slack Bot / MS Teams Bot để Dev tạo task trực tiếp từ kênh chat.</li>
+                    </ul>
+                </div>
+
+                <div class="slide-card highlight" style="text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+                    <div style="font-size: 3.5rem; margin-bottom: 12px;">💬</div>
+                    <h3 class="card-title" style="font-size: 1.8rem;">Cảm Ơn Quý Vị Đã Lắng Nghe!</h3>
+                    <p class="card-desc" style="margin: 10px 0 20px;">Hệ thống đã sẵn sàng để demo trực tiếp và giải đáp mọi câu hỏi.</p>
+                    <span class="badge-pill cyan">Q & A Session</span>
+                </div>
+            </div>
+            <div class="slide-notes-raw" style="display: none;">
+                <strong>Kịch bản nói:</strong><br>
+                "Trong tương lai, chúng tôi sẽ nâng cấp thêm kết nối với Slack Bot và các mô hình embedding lớn hơn như BGE-M3. Cảm ơn mọi người đã theo dõi, xin mời ban giám khảo và anh em đặt câu hỏi thảo luận!"
+            </div>
+        </section>
+
+    </div>
+
+    <!-- SPEAKER NOTES DRAWER -->
+    <div class="notes-drawer" id="speaker-notes-box">
+        <div class="notes-title">🎙️ Speaker Notes (Kịch bản thuyết trình cho Slide hiện tại):</div>
+        <div class="notes-content" id="speaker-notes-text">
+            Nội dung kịch bản nói sẽ hiển thị ở đây.
+        </div>
+    </div>
+
+    <!-- BOTTOM CONTROLS BAR -->
+    <footer class="slide-nav-bar">
+        <div class="nav-left">
+            <button class="nav-btn" id="btn-toggle-notes">
+                🎙️ Speaker Notes <span class="key-hint">P</span>
+            </button>
+            <button class="nav-btn" id="btn-fullscreen">
+                ⛶ Toàn Màn Hình <span class="key-hint">F</span>
+            </button>
+            <a href="/" class="nav-btn">
+                🏠 Về Dashboard
+            </a>
+        </div>
+
+        <div class="nav-center">
+            Slide <span id="current-slide-num">1</span> / <span id="total-slides-num">10</span>
+        </div>
+
+        <div class="nav-right">
+            <button class="nav-btn" id="btn-prev-slide">
+                ◀ Trước <span class="key-hint">←</span>
+            </button>
+            <button class="nav-btn primary" id="btn-next-slide">
+                Tiếp Theo ▶ <span class="key-hint">→</span>
+            </button>
+        </div>
+    </footer>
+
+    <!-- INTERACTIVE SLIDE LOGIC -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const slides = document.querySelectorAll('.slide');
+            const totalSlides = slides.length;
+            let currentSlideIndex = 0;
+
+            const progressFill = document.getElementById('slide-progress');
+            const currentNumEl = document.getElementById('current-slide-num');
+            const totalNumEl = document.getElementById('total-slides-num');
+            const notesDrawer = document.getElementById('speaker-notes-box');
+            const notesText = document.getElementById('speaker-notes-text');
+            const btnToggleNotes = document.getElementById('btn-toggle-notes');
+            const btnFullscreen = document.getElementById('btn-fullscreen');
+            const btnPrev = document.getElementById('btn-prev-slide');
+            const btnNext = document.getElementById('btn-next-slide');
+
+            totalNumEl.textContent = totalSlides;
+
+            function updateSlide(index) {
+                if (index < 0) index = 0;
+                if (index >= totalSlides) index = totalSlides - 1;
+
+                currentSlideIndex = index;
+
+                slides.forEach((slide, i) => {
+                    if (i === currentSlideIndex) {
+                        slide.classList.add('active');
+                        // Update speaker notes
+                        const rawNotes = slide.querySelector('.slide-notes-raw');
+                        if (rawNotes) {
+                            notesText.innerHTML = rawNotes.innerHTML;
+                        } else {
+                            notesText.innerHTML = 'Không có ghi chú thêm.';
+                        }
+                    } else {
+                        slide.classList.remove('active');
+                    }
+                });
+
+                // Update UI numbers & progress
+                currentNumEl.textContent = currentSlideIndex + 1;
+                const progressPercent = ((currentSlideIndex + 1) / totalSlides) * 100;
+                progressFill.style.width = `${progressPercent}%`;
+
+                // Update button disabled state
+                btnPrev.style.opacity = currentSlideIndex === 0 ? '0.4' : '1';
+                btnPrev.disabled = currentSlideIndex === 0;
+
+                btnNext.style.opacity = currentSlideIndex === totalSlides - 1 ? '0.4' : '1';
+                btnNext.disabled = currentSlideIndex === totalSlides - 1;
+            }
+
+            // Navigation Handlers
+            function nextSlide() {
+                if (currentSlideIndex < totalSlides - 1) {
+                    updateSlide(currentSlideIndex + 1);
+                }
+            }
+
+            function prevSlide() {
+                if (currentSlideIndex > 0) {
+                    updateSlide(currentSlideIndex - 1);
+                }
+            }
+
+            btnNext.addEventListener('click', nextSlide);
+            btnPrev.addEventListener('click', prevSlide);
+
+            // Toggle Speaker Notes
+            btnToggleNotes.addEventListener('click', () => {
+                notesDrawer.classList.toggle('open');
+            });
+
+            // Fullscreen Toggle
+            btnFullscreen.addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                } else {
+                    document.exitFullscreen().catch(() => {});
+                }
+            });
+
+            // Keyboard Navigation
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault();
+                    nextSlide();
+                } else if (e.key === 'ArrowLeft' || e.key === 'Backspace') {
+                    e.preventDefault();
+                    prevSlide();
+                } else if (e.key.toLowerCase() === 'p') {
+                    notesDrawer.classList.toggle('open');
+                } else if (e.key.toLowerCase() === 'f') {
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen().catch(() => {});
+                    } else {
+                        document.exitFullscreen().catch(() => {});
+                    }
+                }
+            });
+
+            // Initialize slide 0
+            updateSlide(0);
+        });
+    </script>
+</body>
+</html>

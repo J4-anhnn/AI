@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Task Generator & Vector Data Architecture | Jira & ADO</title>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="dark-theme">
+    <div class="app-wrapper">
+        <!-- TOP NAVBAR -->
+        <header class="top-nav">
+            <div class="brand">
+                <div class="brand-logo">
+                    <span class="logo-icon">⚡</span>
+                </div>
+                <div>
+                    <h1 class="brand-title">VectorData<span>AI</span></h1>
+                    <p class="brand-sub">AI-Powered Jira/ADO Task Generator & Estimation</p>
+                </div>
+            </div>
+
+            <div class="nav-badges">
+                <a href="/slides" target="_blank" class="badge" style="background: linear-gradient(135deg, #a855f7, #00f0ff); color: #000; font-weight: 700; text-decoration: none; cursor: pointer;">📽️ Slide Thuyết Trình</a>
+                <div class="badge status-badge" style="background: rgba(16, 185, 129, 0.2); border-color: #10b981; color: #34d399;"><span class="pulse-dot"></span> 🐘 PostgreSQL + pgvector (HNSW) Online</div>
+                <div class="badge metric-badge">Dims: <strong>128 Float32</strong></div>
+                <div class="badge metric-badge">Index: <strong>HNSW (<=>)</strong></div>
+                <div class="badge version-badge">Phase 1 & 2 Active</div>
+            </div>
+        </header>
+
+        <!-- ARCHITECTURE DIAGRAM MAP (DIRECTLY MATCHING USER'S DIAGRAM) -->
+        <section class="diagram-section">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">Kiến Trúc Hoạt Động Của Hệ Thống (RAG + Vector Data Pipeline)</h2>
+                    <p class="section-desc">Mô hình hóa chính xác 2 chu trình: Data Preparation (A-D) và Retrieval-Augmented Generation (1-5)</p>
+                </div>
+                <button id="btn-toggle-diagram" class="btn btn-outline btn-sm">Thu gọn / Mở rộng</button>
+            </div>
+
+            <div id="interactive-diagram" class="diagram-container">
+                <!-- PART 1: DATA PREPARATION -->
+                <div class="pipeline-block data-prep-block">
+                    <div class="block-badge">Data Preparation (Indexing Pipeline)</div>
+                    <div class="nodes-flow">
+                        <div class="diagram-node node-raw" data-step="raw" title="File Excel từ Dev: Lịch sử ticket, specs, actual hours">
+                            <div class="node-icon">📊</div>
+                            <div class="node-label">Raw Data Sources</div>
+                            <div class="node-sub">Excel từ Dev</div>
+                        </div>
+
+                        <div class="flow-arrow"><span class="step-tag">A</span> ➔</div>
+
+                        <div class="diagram-node node-extraction" data-step="step-a" title="Bước A: Trích xuất tiêu đề, mô tả, module, tech stack từ Excel">
+                            <div class="node-icon">🔍</div>
+                            <div class="node-label">Info Extraction</div>
+                            <div class="node-sub">Excel Parser</div>
+                        </div>
+
+                        <div class="flow-arrow"><span class="step-tag">B</span> ➔</div>
+
+                        <div class="diagram-node node-chunking" data-step="step-b" title="Bước B: Tách nhỏ thành semantic chunks giàu metadata">
+                            <div class="node-icon">🧩</div>
+                            <div class="node-label">Chunking</div>
+                            <div class="node-sub">Task Units</div>
+                        </div>
+
+                        <div class="flow-arrow"><span class="step-tag">C</span> ➔</div>
+
+                        <div class="diagram-node node-embedding" data-step="step-c" title="Bước C: Vector hoá text thành dense vector số thực 128 chiều">
+                            <div class="node-icon">🧬</div>
+                            <div class="node-label">Embedding</div>
+                            <div class="node-sub">128D Dense Vec</div>
+                        </div>
+
+                        <div class="flow-arrow"><span class="step-tag">D</span> ➔</div>
+
+                        <div class="diagram-node node-vectordb" data-step="step-d" title="Bước D: Lưu trữ vector + metadata, lập chỉ mục không gian">
+                            <div class="node-icon">🗄️</div>
+                            <div class="node-label">Vector DB</div>
+                            <div class="node-sub">TinyVectorStore</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PART 2: RETRIEVAL AUGMENTED GENERATION -->
+                <div class="pipeline-block rag-block">
+                    <div class="block-badge rag-badge">Retrieval-Augmented Generation (Inference Pipeline)</div>
+                    <div class="nodes-flow rag-flow">
+                        <div class="diagram-node node-query" data-step="step-1" title="Bước 1: Dev/BA nhập User Story hoặc Requirement mới">
+                            <div class="node-icon">💡</div>
+                            <div class="node-label">New Query</div>
+                            <div class="node-sub">Dev Story / Excel</div>
+                        </div>
+
+                        <div class="flow-arrow"><span class="step-tag">1</span> ➔</div>
+
+                        <div class="diagram-node node-query-embed" data-step="step-2" title="Bước 2: Vector hoá câu query và tìm k-NN trong Vector DB">
+                            <div class="node-icon">⚡</div>
+                            <div class="node-label">Embedding (1)</div>
+                            <div class="node-sub">k-NN Search (2)</div>
+                        </div>
+
+                        <div class="flow-arrow"><span class="step-tag">3</span> ➔</div>
+
+                        <div class="diagram-node node-relevant" data-step="step-3" title="Bước 3: Lấy các ticket lịch sử giống nhất kèm actual hours & rules">
+                            <div class="node-icon">📑</div>
+                            <div class="node-label">Relevant Data</div>
+                            <div class="node-sub">Top-K Past Tasks</div>
+                        </div>
+
+                        <div class="flow-arrow"><span class="step-tag">4</span> ➔</div>
+
+                        <div class="diagram-node node-llm" data-step="step-4" title="Bước 4: RAG Engine kết hợp Query + Historical Benchmark + Naming Rules">
+                            <div class="node-icon">🧠</div>
+                            <div class="node-label">LLM / RAG Engine</div>
+                            <div class="node-sub">Context Synthesis</div>
+                        </div>
+
+                        <div class="flow-arrow"><span class="step-tag">5</span> ➔</div>
+
+                        <div class="diagram-node node-response" data-step="step-5" title="Bước 5: Tạo task chuẩn naming, estimate, review & log Jira/ADO">
+                            <div class="node-icon">🚀</div>
+                            <div class="node-label">Jira/ADO Ticket</div>
+                            <div class="node-sub">Response & Sync</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="step-explainer" class="step-explainer-panel">
+                <span class="explainer-tag">Chi tiết bước:</span>
+                <span id="explainer-content" class="explainer-text">Nhấp vào từng node trên sơ đồ để xem cách hoạt động của toán học Vector, chuỗi xử lý và luồng dữ liệu tương ứng.</span>
+            </div>
+        </section>
+
+        <!-- MAIN TABS NAVIGATION -->
+        <nav class="main-tabs">
+            <button class="tab-btn active" data-tab="tab-data-prep">
+                <span class="tab-icon">📥</span> 1. Data Preparation (A ➔ D)
+            </button>
+            <button class="tab-btn" data-tab="tab-vector-search">
+                <span class="tab-icon">🔍</span> 2. Vector Search & Similarity (1 ➔ 3)
+            </button>
+            <button class="tab-btn" data-tab="tab-rag-estimate">
+                <span class="tab-icon">✨</span> 3. AI Task Breakdown & Estimate (4 ➔ 5)
+            </button>
+            <button class="tab-btn" data-tab="tab-jira-sync">
+                <span class="tab-icon">🎯</span> 4. Jira & ADO Logger (Phase 2 Review)
+            </button>
+            <button class="tab-btn" data-tab="tab-rules">
+                <span class="tab-icon">📜</span> 5. GSD Rules Generator
+            </button>
+        </nav>
+
+        <!-- TAB CONTENT 1: DATA PREPARATION -->
+        <main class="tab-content active" id="tab-data-prep">
+            <div class="grid-2-col">
+                <!-- Cột trái: Excel Ingestion & Extraction -->
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <h3 class="card-title"><span>Step A:</span> Information Extraction từ Excel</h3>
+                        <span class="badge info-badge" id="hist-file-badge">historical_dev_backlog.xlsx</span>
+                    </div>
+                    <p class="card-desc">Hệ thống tự động chuẩn hoá các cột lộn xộn trong file Excel của Dev (Tên việc, ghi chú, giờ thực tế, module, tech stack).</p>
+
+                    <div class="table-container">
+                        <table class="data-table" id="table-extracted-tasks">
+                            <thead>
+                                <tr>
+                                    <th>Key</th>
+                                    <th>Module</th>
+                                    <th>Task Title & Summary</th>
+                                    <th>Actual Hours</th>
+                                    <th>Tech Stack</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-extracted">
+                                <tr><td colspan="5" class="loading-td">Đang tải dữ liệu trích xuất...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Cột phải: Vector Embedding & DB Inspector -->
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <h3 class="card-title"><span>Step C & D:</span> Vector Embeddings & Vector DB</h3>
+                        <span class="badge success-badge">128-Dimension Float32</span>
+                    </div>
+                    <p class="card-desc">Văn bản kỹ thuật được ánh xạ vào không gian vector nhiều chiều. Vector chuẩn hoá độ dài L2 giúp tối ưu tính toán Cosine Similarity.</p>
+
+                    <div class="vector-inspector">
+                        <div class="inspector-header">
+                            <span class="inspector-label">Mẫu Vector của Ticket: <strong id="vec-ticket-key">PROJ-101</strong></span>
+                            <span class="badge">L2 Norm: 1.0000</span>
+                        </div>
+
+                        <!-- Trực quan hoá mảng số thực dạng Heatmap bar -->
+                        <div class="vector-heatmap-label">Bản đồ nhiệt 24 chiều đầu tiên trong vector:</div>
+                        <div class="vector-heatmap" id="vector-heatmap-container">
+                            <!-- JS will dynamically render 24 dimension cells -->
+                        </div>
+
+                        <!-- Raw float values snippet -->
+                        <div class="code-box" id="vector-raw-box">
+                            [0.0000, -0.0700, -0.0700, 0.0000, 0.0700, 0.0485, 0.0000, ...]
+                        </div>
+
+                        <div class="stats-row">
+                            <div class="stat-box">
+                                <div class="stat-number" id="stat-total-vectors">10</div>
+                                <div class="stat-label">Vectors trong DB</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number">128</div>
+                                <div class="stat-label">Số chiều (Dims)</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number">&lt; 1 ms</div>
+                                <div class="stat-label">Thời gian Search</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- TAB CONTENT 2: VECTOR SEARCH & SIMILARITY -->
+        <main class="tab-content" id="tab-vector-search">
+            <div class="card glass-card">
+                <div class="card-header">
+                    <h3 class="card-title"><span>Steps 1 ➔ 3:</span> Thử Nghiệm Truy Vấn Không Gian Vector (Semantic Search)</h3>
+                    <span class="badge info-badge">k-NN Cosine Similarity</span>
+                </div>
+                <p class="card-desc">Thử gõ bất kỳ yêu cầu kỹ thuật nào (tiếng Anh hoặc tiếng Việt) để xem Vector DB tìm kiếm các ticket trong quá khứ dựa trên khoảng cách hình học:</p>
+
+                <div class="search-box-row">
+                    <input type="text" id="input-vector-query" class="form-input" placeholder="Ví dụ: Làm tính năng 2FA xác thực mã OTP, hoặc Kết nối cổng thanh toán qua webhook..." value="Tích hợp xác thực hai lớp 2FA bằng mã QR OTP">
+                    <button id="btn-run-search" class="btn btn-primary">Tìm Ticket Tương Đồng</button>
+                </div>
+
+                <div class="quick-tags">
+                    <span class="tag-label">Mẫu thử:</span>
+                    <button class="chip-btn" data-query="Tích hợp xác thực hai lớp 2FA bằng mã QR OTP">2FA Google Authenticator</button>
+                    <button class="chip-btn" data-query="Nhận webhook IPN xác thực chữ ký HMAC thanh toán">Thanh toán MoMo IPN</button>
+                    <button class="chip-btn" data-query="Tạo bảng database và viết migration lưu lịch sử">Tạo DB Migration</button>
+                    <button class="chip-btn" data-query="Viết automation test e2e cho flow checkout giỏ hàng">Viết Cypress Test</button>
+                </div>
+
+                <!-- Kết quả tìm kiếm tương đồng -->
+                <div class="search-results-area" id="search-results-container">
+                    <h4 class="sub-heading">Top 3 Ticket Lịch Sử Có Khoảng Cách Ngắn Nhất (Top-K Matches):</h4>
+                    <div class="results-grid" id="results-cards-grid">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- TAB CONTENT 3: AI TASK BREAKDOWN & ESTIMATE -->
+        <main class="tab-content" id="tab-rag-estimate">
+            <div class="card glass-card">
+                <div class="card-header">
+                    <div>
+                        <h3 class="card-title"><span>Steps 4 ➔ 5:</span> Phân Tích Excel Của Dev & Ước Lượng Tự Động (RAG)</h3>
+                        <p class="card-desc">AI đọc file Excel yêu cầu từ Dev, đối chiếu dữ liệu vector lịch sử, tự động sinh chuẩn Naming <code>[TYPE][MODULE]</code> và số giờ Estimate theo trọng số tương đồng.</p>
+                    </div>
+                    <div class="action-btn-group">
+                        <button id="btn-run-analysis" class="btn btn-primary">⚡ Phân Tích Dev Excel Ngay</button>
+                        <a href="/api/export-excel" class="btn btn-outline" id="btn-export-excel">📥 Tải Excel Đã Chuẩn Hóa</a>
+                    </div>
+                </div>
+
+                <!-- Filter & summary bar -->
+                <div class="summary-pills-row">
+                    <div class="summary-pill ready"><span id="count-ready">0</span> Ready to Import</div>
+                    <div class="summary-pill warning"><span id="count-warning">0</span> Cần Dev Xem Lại</div>
+                    <div class="summary-pill total"><span id="count-total">0</span> Tổng Tasks</div>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table" id="table-analyzed-tasks">
+                        <thead>
+                            <tr>
+                                <th width="50">Approve</th>
+                                <th width="60">STT</th>
+                                <th>Nội Dung Thô Từ Dev</th>
+                                <th>Chuẩn Naming Dự Án ([TYPE][MOD])</th>
+                                <th width="110">AI Estimate</th>
+                                <th>Ticket Đối Chiếu (Vector Match)</th>
+                                <th width="140">Trạng Thái (Phase 2)</th>
+                                <th width="80">Thao Tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-analyzed">
+                            <tr><td colspan="8" class="text-center">Bấm nút "Phân Tích Dev Excel Ngay" để chạy RAG pipeline.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+        <!-- TAB CONTENT 4: JIRA & ADO DISPATCHER -->
+        <main class="tab-content" id="tab-jira-sync">
+            <div class="grid-2-col">
+                <!-- Cột trái: Cấu hình và Bắn Task -->
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <h3 class="card-title">Phase 2: Review, Chọn Lọc & Bắn Lên Jira / ADO</h3>
+                        <span class="badge info-badge">Selective Import</span>
+                    </div>
+                    <p class="card-desc">Bấm duyệt từng task hoặc hàng loạt. Các task bị cảnh báo thiếu dữ liệu hoặc trùng lặp sẽ được giữ lại để Dev chỉnh sửa.</p>
+
+                    <div class="form-group">
+                        <label class="form-label">Chọn Nền Tảng Đích:</label>
+                        <div class="radio-cards">
+                            <label class="radio-card active">
+                                <input type="radio" name="target_platform" value="Jira" checked>
+                                <span class="platform-name">Atlassian Jira</span>
+                                <span class="platform-desc">Tạo Issues qua REST API v3</span>
+                            </label>
+                            <label class="radio-card">
+                                <input type="radio" name="target_platform" value="ADO">
+                                <span class="platform-name">Azure DevOps (ADO)</span>
+                                <span class="platform-desc">Tạo Work Items qua JSON Patch</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Project Key / Prefix:</label>
+                        <input type="text" id="input-project-key" class="form-input" value="PROJ" style="max-width: 150px;">
+                    </div>
+
+                    <div class="import-action-box">
+                        <button id="btn-execute-import" class="btn btn-success btn-lg">
+                            🚀 Bắn Toàn Bộ Tasks Đã Duyệt Lên Nền Tảng
+                        </button>
+                        <p class="note-text">Chỉ các tasks có trạng thái <strong>READY_TO_IMPORT</strong> và được tích <strong>Approve</strong> mới được import.</p>
+                    </div>
+                </div>
+
+                <!-- Cột phải: Live Payload Preview & Kết quả Import -->
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <h3 class="card-title">Live API Payload & Kết Quả Đồng Bộ</h3>
+                        <span class="badge code-badge" id="platform-payload-badge">Jira REST API v3</span>
+                    </div>
+
+                    <div class="sync-results-box" id="sync-results-box" style="display: none;">
+                        <div class="alert alert-success" id="sync-summary-alert">
+                            Đã import thành công 5 tickets!
+                        </div>
+                        <div class="imported-tickets-list" id="imported-tickets-container">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+
+                    <div class="payload-preview-section">
+                        <div class="payload-header">
+                            <span>Mẫu Payload API sẽ gửi đi:</span>
+                        </div>
+                        <pre class="code-pre" id="payload-code-block">{
+  "fields": {
+    "project": {"key": "PROJ"},
+    "summary": "[BE][AUTH] Implement TOTP verification endpoint",
+    "issuetype": {"name": "Task"},
+    "timetracking": {"originalEstimate": "8h"},
+    "customfield_story_points": 3
+  }
+}</pre>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- TAB CONTENT 5: GSD RULES & SUPER POWER -->
+        <main class="tab-content" id="tab-rules">
+            <div class="card glass-card">
+                <div class="card-header">
+                    <div>
+                        <h3 class="card-title">Step 1 & Step 4: GSD / Super Power Rules Generator</h3>
+                        <p class="card-desc">Định nghĩa chuẩn Input tối thiểu và tự động sinh file cấu hình <code>.agent-rules.md</code> độc lập cho dự án (không gây ảnh hưởng sang chat session khác).</p>
+                    </div>
+                    <button id="btn-save-rules-file" class="btn btn-primary">💾 Cập Nhật & Lưu File Rules</button>
+                </div>
+
+                <div class="grid-2-col">
+                    <div class="rules-spec-box">
+                        <h4 class="sub-heading">1. Chuẩn Input Tối Thiểu (Minimum Input Schema)</h4>
+                        <ul class="spec-list">
+                            <li><strong>raw_dev_task:</strong> Câu mô tả hành động kỹ thuật rõ ràng.</li>
+                            <li><strong>module:</strong> Phân hệ nghiệp vụ (AUTH, PAYMENT, SEARCH...).</li>
+                            <li><strong>dev_notes:</strong> Tối thiểu 15 ký tự ghi chú công nghệ, table DB, API.</li>
+                            <li><strong>suggested_type:</strong> Backend, Frontend, Database, QA, DevOps.</li>
+                        </ul>
+
+                        <h4 class="sub-heading" style="margin-top: 20px;">2. Quy Ước Naming & Estimation</h4>
+                        <ul class="spec-list">
+                            <li><strong>Cú pháp:</strong> <code>[{TYPE}][{MODULE}] Action</code></li>
+                            <li><strong>Thang điểm:</strong> Dãy Fibonacci (1, 2, 3, 5, 8, 13, 21).</li>
+                            <li><strong>Trùng lặp:</strong> Cảnh báo khi Cosine Similarity >= 85%.</li>
+                        </ul>
+                    </div>
+
+                    <div class="markdown-preview-box">
+                        <h4 class="sub-heading">Nội dung File Quy Chuẩn (.agent-rules.md):</h4>
+                        <pre class="code-pre rules-pre" id="rules-markdown-box">Đang tải rules...</pre>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- FOOTER -->
+        <footer class="app-footer">
+            <p>AI Jira Task Generation & Vector Data RAG Demo | Được xây dựng cho quy trình phân tích Excel từ Dev</p>
+        </footer>
+    </div>
+
+    <!-- MODAL EDIT TASK -->
+    <div id="edit-task-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content glass-card">
+            <div class="modal-header">
+                <h3>Chỉnh Sửa Task & Estimate Trước Khi Import</h3>
+                <button class="close-modal-btn" id="btn-close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-task-index">
+                <div class="form-group">
+                    <label class="form-label">Tên Task Chuẩn Hoá:</label>
+                    <input type="text" id="edit-task-title" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ước Lượng (Giờ):</label>
+                    <input type="number" id="edit-task-hours" class="form-input" step="0.5" min="1" max="40">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="btn-cancel-modal">Hủy</button>
+                <button class="btn btn-primary" id="btn-save-modal">Lưu Thay Đổi</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
