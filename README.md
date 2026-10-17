@@ -229,7 +229,6 @@ psql ai_vector_rag -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ### Bước 1 — Khởi Động Server
 
 ```bash
-cd /Users/user/Documents/AI
 python3 app.py
 ```
 
@@ -279,7 +278,6 @@ Mở **`http://127.0.0.1:5005/slides`** để xem toàn bộ kiến trúc hệ t
 ### Bước 6 — Demo CLI (Terminal Mode)
 
 ```bash
-cd /Users/user/Documents/AI
 python3 cli_demo.py
 ```
 
@@ -291,14 +289,12 @@ Terminal sẽ hiển thị toàn bộ RAG pipeline với rich formatting: embedd
 
 ### Cách 1: Chạy Web Dashboard Trực Quan
 ```bash
-cd /Users/user/Documents/AI
 python3 app.py
 ```
 Mở trình duyệt tại: **`http://127.0.0.1:5005`**
 
 ### Cách 2: Chạy Terminal CLI Demo
 ```bash
-cd /Users/user/Documents/AI
 python3 cli_demo.py
 ```
 
@@ -308,8 +304,6 @@ python3 cli_demo.py
 
 | Variable | Default | Mô tả |
 |----------|---------|-------|
-| `LLM_BASE_URL` | `https://aiportalapi.stu-platform.live/jpe` | Endpoint Gemini-3-Flash proxy |
-| `LLM_API_KEY` | `sk-nLkexsHhayST-zLiArKwBg` | API Key |
 | `LLM_MODEL` | `Gemini-3-Flash` | Tên model |
 | `DB_HOST` | `localhost` | PostgreSQL host |
 | `DB_PORT` | `5432` | PostgreSQL port |
